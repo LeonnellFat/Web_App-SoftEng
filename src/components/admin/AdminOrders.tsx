@@ -1,10 +1,11 @@
 import { useState, useEffect } from "react";
 import supabase from "../../services/supabaseClient";
 import { motion } from "motion/react";
-import { Search } from "lucide-react";
+import { Search, Trash2, Check } from "lucide-react";
 import { Button } from "../ui/button";
 import { Input } from "../ui/input";
 import { toast, Toaster } from "sonner";
+import { fetchDrivers, assignDriverToOrder, type Driver } from "../../services/driverService";
 import type { Order } from "../../App";
 
 interface AdminOrdersProps {
@@ -17,6 +18,11 @@ export function AdminOrders({ orders, onUpdateOrders }: AdminOrdersProps) {
   const [entriesPerPage, setEntriesPerPage] = useState(100);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [deleteOrderId, setDeleteOrderId] = useState<string | null>(null);
+  const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
+  const [drivers, setDrivers] = useState<Driver[]>([]);
+  const [driversLoading, setDriversLoading] = useState(true);
+  const [assigningDriverTo, setAssigningDriverTo] = useState<string | null>(null);
 
   const filteredOrders = orders.filter((order) =>
     Object.values(order).some((value) => {
@@ -59,23 +65,136 @@ export function AdminOrders({ orders, onUpdateOrders }: AdminOrdersProps) {
     }
   };
 
-  const handleAssignDriver = async (orderId: string, driverName: string) => {
+  const handleAcceptOrder = async (orderId: string) => {
     try {
-      // First update in Supabase
+      const toastId = toast.loading('Accepting order...');
+      
+      // Update status to Confirmed directly
       const { error } = await supabase
         .from('orders')
-        .update({ driver_id: driverName })
+        .update({ status: 'Confirmed' })
         .eq('id', orderId);
+
+      if (error) throw error;
+
+      // Update local state
+      onUpdateOrders(orders.map(order => 
+        order.id === orderId ? { ...order, status: 'Confirmed' } : order
+      ));
+
+      toast.success('Order accepted! Now you can assign a driver.', {
+        id: toastId,
+        duration: 2000,
+      });
+    } catch (err) {
+      console.error('Failed to accept order:', err);
+      const message = (err && (err.message || err.error_description || err.details)) || 'Failed to accept order. Please try again.';
+      const details = err?.details ? String(err.details) : '';
+      toast.error(message + (details ? ` — ${details}` : ''), { duration: 5000 });
+    }
+  };
+
+  const handleAssignDriver = async (orderId: string, driverId: string) => {
+    try {
+      // Don't submit empty selection
+      if (!driverId) {
+        return;
+      }
+
+      const toastId = toast.loading('Assigning driver...');
+
+      // Find the driver to get their profileId (which is what the foreign key expects)
+      const selectedDriver = drivers.find(d => d.id === driverId);
+      if (!selectedDriver) {
+        throw new Error('Driver not found');
+      }
+
+      // Use the service function
+      const { error } = await assignDriverToOrder(orderId, selectedDriver.profileId);
 
       if (error) throw error;
 
       // If successful, update local state
       onUpdateOrders(orders.map(order => 
-        order.id === orderId ? { ...order, driver: driverName } : order
+        order.id === orderId ? { ...order, driver: selectedDriver.name } : order
       ));
+
+      toast.success('Driver assigned successfully', {
+        id: toastId,
+        duration: 2000,
+      });
     } catch (err) {
       console.error('Failed to update driver:', err);
-      // You might want to show an error toast here
+      const message = (err && (err.message || err.error_description || err.details)) || 'Failed to assign driver. Please try again.';
+      const details = err?.details ? String(err.details) : '';
+      toast.error(message + (details ? ` — ${details}` : ''), { duration: 5000 });
+    }
+  };
+
+  const handleDeleteOrder = async () => {
+    if (!deleteOrderId) return;
+
+    try {
+      const toastId = toast.loading('Deleting order...');
+      
+      console.log('Attempting to delete order with ID:', deleteOrderId);
+      
+      // Delete order items first (due to foreign key constraint)
+      const { error: itemsError } = await supabase
+        .from('order_items')
+        .delete()
+        .eq('order_id', deleteOrderId);
+
+      if (itemsError) {
+        console.error('Error deleting order items:', itemsError);
+        throw itemsError;
+      }
+
+      console.log('Order items deleted successfully');
+
+      // Then delete the order
+      const { error: orderError } = await supabase
+        .from('orders')
+        .delete()
+        .eq('id', deleteOrderId);
+
+      if (orderError) {
+        console.error('Error deleting order:', orderError);
+        throw orderError;
+      }
+
+      console.log('Order deletion query completed. Verifying...');
+
+      // Verify the order was actually deleted by fetching it
+      const { data: verifyOrder, error: verifyError } = await supabase
+        .from('orders')
+        .select('id')
+        .eq('id', deleteOrderId)
+        .single();
+
+      if (!verifyError && verifyOrder) {
+        console.error('Verification failed: Order still exists in database!');
+        throw new Error('Order deletion failed - RLS permission issue? Order still exists in database');
+      }
+
+      console.log('Order verified deleted');
+
+      // Update local state only AFTER successful deletion verification
+      onUpdateOrders(orders.filter(order => order.id !== deleteOrderId));
+
+      toast.success('Order deleted successfully', {
+        id: toastId,
+        duration: 2000,
+      });
+
+      setIsDeleteDialogOpen(false);
+      setDeleteOrderId(null);
+    } catch (err) {
+      console.error('Full delete error:', err);
+      const message = (err && (err.message || err.error_description || err.details)) || 'Failed to delete order. Please try again.';
+      toast.error(message, { duration: 5000 });
+      setIsDeleteDialogOpen(false);
+      setDeleteOrderId(null);
     }
   };
 
@@ -139,9 +258,23 @@ export function AdminOrders({ orders, onUpdateOrders }: AdminOrdersProps) {
     }
   };
 
+  const loadDrivers = async () => {
+    try {
+      setDriversLoading(true);
+      const driversList = await fetchDrivers();
+      setDrivers(driversList);
+    } catch (err) {
+      console.error("Failed to fetch drivers:", err);
+      toast.error('Failed to load drivers', { duration: 3000 });
+    } finally {
+      setDriversLoading(false);
+    }
+  };
+
   useEffect(() => {
     // Load once on mount
     fetchOrdersFromDb();
+    loadDrivers();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -201,20 +334,20 @@ export function AdminOrders({ orders, onUpdateOrders }: AdminOrdersProps) {
         className="bg-white rounded-lg border border-gray-200 overflow-hidden"
       >
         <div className="overflow-x-auto">
-          <table className="w-full">
-            <thead className="bg-gray-50 border-b border-gray-200">
+          <table className="w-full min-w-max">
+            <thead className="bg-gray-50 border-b border-gray-200 sticky top-0">
               <tr>
-                <th className="px-6 py-3 text-left text-sm text-gray-600">#</th>
-                <th className="px-6 py-3 text-left text-sm text-gray-600">Name</th>
-                <th className="px-6 py-3 text-left text-sm text-gray-600">Order Id</th>
-                <th className="px-6 py-3 text-left text-sm text-gray-600">Items</th>
-                <th className="px-6 py-3 text-left text-sm text-gray-600">Amount</th>
-                <th className="px-6 py-3 text-left text-sm text-gray-600">Phone</th>
-                <th className="px-6 py-3 text-left text-sm text-gray-600">Order Date</th>
-                <th className="px-6 py-3 text-left text-sm text-gray-600">Status</th>
-                <th className="px-6 py-3 text-left text-sm text-gray-600">Payment</th>
-                <th className="px-6 py-3 text-left text-sm text-gray-600">Driver</th>
-                <th className="px-6 py-3 text-left text-sm text-gray-600">Action</th>
+                <th className="px-3 sm:px-4 py-3 text-left text-xs sm:text-sm text-gray-600 whitespace-nowrap">#</th>
+                <th className="px-3 sm:px-4 py-3 text-left text-xs sm:text-sm text-gray-600 whitespace-nowrap">Name</th>
+                <th className="px-3 sm:px-4 py-3 text-left text-xs sm:text-sm text-gray-600 whitespace-nowrap">Order Id</th>
+                <th className="px-3 sm:px-4 py-3 text-left text-xs sm:text-sm text-gray-600 whitespace-nowrap">Items</th>
+                <th className="px-3 sm:px-4 py-3 text-left text-xs sm:text-sm text-gray-600 whitespace-nowrap">Amount</th>
+                <th className="px-3 sm:px-4 py-3 text-left text-xs sm:text-sm text-gray-600 whitespace-nowrap">Phone</th>
+                <th className="px-3 sm:px-4 py-3 text-left text-xs sm:text-sm text-gray-600 whitespace-nowrap">Order Date</th>
+                <th className="px-3 sm:px-4 py-3 text-left text-xs sm:text-sm text-gray-600 whitespace-nowrap">Status</th>
+                <th className="px-3 sm:px-4 py-3 text-left text-xs sm:text-sm text-gray-600 whitespace-nowrap">Payment</th>
+                <th className="px-3 sm:px-4 py-3 text-left text-xs sm:text-sm text-gray-600 whitespace-nowrap">Driver</th>
+                <th className="px-3 sm:px-4 py-3 text-left text-xs sm:text-sm text-gray-600 whitespace-nowrap">Action</th>
               </tr>
             </thead>
             <tbody>
@@ -227,20 +360,22 @@ export function AdminOrders({ orders, onUpdateOrders }: AdminOrdersProps) {
                     transition={{ delay: index * 0.05 }}
                     className="border-b border-gray-100 hover:bg-gray-50 transition-colors"
                   >
-                    <td className="px-6 py-4 text-sm">{index + 1}</td>
-                    <td className="px-6 py-4 text-sm">{order.name}</td>
-                    <td className="px-6 py-4 text-sm">{order.orderId}</td>
-                    <td className="px-6 py-4 text-sm">
-                      {order.items.map(item => item.product.name).join(", ")}
+                    <td className="px-3 sm:px-4 py-3 text-xs sm:text-sm whitespace-nowrap">{index + 1}</td>
+                    <td className="px-3 sm:px-4 py-3 text-xs sm:text-sm whitespace-nowrap max-w-xs truncate">{order.name}</td>
+                    <td className="px-3 sm:px-4 py-3 text-xs sm:text-sm whitespace-nowrap">{order.orderId}</td>
+                    <td className="px-3 sm:px-4 py-3 text-xs sm:text-sm max-w-sm">
+                      <div className="max-h-12 overflow-y-auto text-ellipsis">
+                        {order.items.map(item => item.product.name).join(", ")}
+                      </div>
                     </td>
-                    <td className="px-6 py-4 text-sm">₱{order.totalAmount.toFixed(2)}</td>
-                    <td className="px-6 py-4 text-sm">{order.phone}</td>
-                    <td className="px-6 py-4 text-sm">{order.date}</td>
-                    <td className="px-6 py-4">
+                    <td className="px-3 sm:px-4 py-3 text-xs sm:text-sm whitespace-nowrap font-medium">₱{order.totalAmount.toFixed(2)}</td>
+                    <td className="px-3 sm:px-4 py-3 text-xs sm:text-sm whitespace-nowrap">{order.phone}</td>
+                    <td className="px-3 sm:px-4 py-3 text-xs sm:text-sm whitespace-nowrap">{order.date}</td>
+                    <td className="px-3 sm:px-4 py-3 whitespace-nowrap">
                       <select
                         value={order.status}
                         onChange={(e) => handleUpdateStatus(order.id, e.target.value as any)}
-                        className={`px-3 py-1 rounded-full text-xs border-0 cursor-pointer ${
+                        className={`px-2 sm:px-3 py-1 rounded-full text-xs border-0 cursor-pointer whitespace-nowrap ${
                           order.status === "Delivered"
                             ? "bg-green-100 text-green-800"
                             : order.status === "Ready"
@@ -259,18 +394,57 @@ export function AdminOrders({ orders, onUpdateOrders }: AdminOrdersProps) {
                         <option value="Delivered">Delivered</option>
                       </select>
                     </td>
-                    <td className="px-6 py-4 text-sm">{order.payment}</td>
-                    <td className="px-6 py-4 text-sm">{order.driver}</td>
-                    <td className="px-6 py-4">
-                      <button className="text-[#FF69B4] hover:text-[#FF1493] text-sm">
-                        View
-                      </button>
+                    <td className="px-3 sm:px-4 py-3 text-xs sm:text-sm whitespace-nowrap">{order.payment}</td>
+                    <td className="px-3 sm:px-4 py-3 text-xs sm:text-sm whitespace-nowrap">
+                      {order.status === "Confirmed" || order.driver !== "Unassigned" ? (
+                        <select
+                          value={
+                            order.driver === "Unassigned" 
+                              ? "" 
+                              : drivers.find(d => d.name === order.driver)?.id || ""
+                          }
+                          onChange={(e) => handleAssignDriver(order.id, e.target.value)}
+                          disabled={driversLoading}
+                          className="px-2 sm:px-3 py-1 rounded-md text-xs border border-gray-300 cursor-pointer hover:border-gray-400 disabled:opacity-50 disabled:cursor-not-allowed"
+                        >
+                          <option value="">Select a driver...</option>
+                          {drivers.map((driver) => (
+                            <option key={driver.id} value={driver.id}>
+                              {driver.name}
+                            </option>
+                          ))}
+                        </select>
+                      ) : (
+                        <span className="text-gray-500 text-xs italic">Accept order to assign</span>
+                      )}
+                    </td>
+                    <td className="px-3 sm:px-4 py-3 whitespace-nowrap">
+                      {order.status === "Pending" ? (
+                        <button 
+                          onClick={() => handleAcceptOrder(order.id)}
+                          className="text-green-600 hover:text-green-800 text-xs sm:text-sm font-medium flex items-center gap-1 hover:bg-green-50 px-2 py-1 rounded transition-colors"
+                        >
+                          <Check size={16} />
+                          <span className="hidden sm:inline">Accept</span>
+                        </button>
+                      ) : (
+                        <button 
+                          onClick={() => {
+                            setDeleteOrderId(order.id);
+                            setIsDeleteDialogOpen(true);
+                          }}
+                          className="text-red-500 hover:text-red-700 text-xs sm:text-sm font-medium flex items-center gap-1 hover:bg-red-50 px-2 py-1 rounded transition-colors"
+                        >
+                          <Trash2 size={16} />
+                          <span className="hidden sm:inline">Delete</span>
+                        </button>
+                      )}
                     </td>
                   </motion.tr>
                 ))
               ) : (
                 <tr>
-                  <td colSpan={11} className="px-6 py-12 text-center text-gray-500">
+                  <td colSpan={11} className="px-3 sm:px-6 py-12 text-center text-gray-500">
                     No orders available
                   </td>
                 </tr>
@@ -297,6 +471,38 @@ export function AdminOrders({ orders, onUpdateOrders }: AdminOrdersProps) {
       
       {/* Toast Notifications */}
       <Toaster />
+
+      {/* Delete Order Confirmation Modal */}
+      {isDeleteDialogOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
+          <div className="bg-white rounded-lg shadow-lg p-6 max-w-sm w-full mx-4">
+            <h2 className="text-lg font-semibold mb-2">Delete Order</h2>
+            <p className="text-gray-600 mb-4">
+              Are you sure you want to delete this order? This action cannot be undone.
+            </p>
+            <div className="bg-gray-100 p-3 rounded mb-6">
+              <p className="text-sm text-gray-600">Order ID: {deleteOrderId}</p>
+            </div>
+            <div className="flex gap-3 justify-end">
+              <button
+                onClick={() => {
+                  setIsDeleteDialogOpen(false);
+                  setDeleteOrderId(null);
+                }}
+                className="px-4 py-2 border border-gray-300 rounded-md text-sm hover:bg-gray-50"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleDeleteOrder}
+                className="px-4 py-2 bg-red-500 hover:bg-red-600 text-white rounded-md text-sm"
+              >
+                Delete
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

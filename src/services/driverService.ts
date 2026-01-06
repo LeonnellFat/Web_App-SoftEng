@@ -278,3 +278,61 @@ export function subscribeToDrivers(callback: (drivers: Driver[]) => void) {
 
   return subscription;
 }
+
+/**
+ * Accept order - change status from Pending to Confirmed
+ */
+export async function acceptOrder(orderId: string) {
+  try {
+    const { data, error } = await supabase
+      .from('orders')
+      .update({ status: 'Confirmed' })
+      .eq('id', orderId)
+      .select();
+    
+    if (error) throw error;
+    console.log('Order accepted:', data);
+    return { data, error };
+  } catch (error) {
+    console.error('Error accepting order:', error);
+    return { data: null, error };
+  }
+}
+
+/**
+ * Assign driver to order
+ */
+export async function assignDriverToOrder(orderId: string, driverId: string) {
+  try {
+    const { data, error } = await supabase
+      .from('orders')
+      .update({ driver_id: driverId })
+      .eq('id', orderId)
+      .select();
+    
+    if (error) throw error;
+    console.log('Driver assigned to order:', data);
+    return { data, error };
+  } catch (error) {
+    console.error('Error assigning driver:', error);
+    return { data: null, error };
+  }
+}
+
+/**
+ * Get all available drivers
+ */
+export async function getAvailableDrivers() {
+  try {
+    const { data, error } = await supabase
+      .from('drivers')
+      .select()
+      .eq('is_available', true);
+    
+    if (error) throw error;
+    return { data, error };
+  } catch (error) {
+    console.error('Error fetching drivers:', error);
+    return { data: null, error };
+  }
+}
