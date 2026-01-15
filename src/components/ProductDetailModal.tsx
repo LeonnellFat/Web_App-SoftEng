@@ -196,19 +196,6 @@ export function ProductDetailModal({ product, onClose, onAddToCart, isLoggedIn =
                   <ShoppingCart className="w-5 h-5 mr-2" />
                   Add to Cart
                 </Button>
-                <Button
-                  variant="outline"
-                  className="p-6 border-[#FF69B4] text-[#FF69B4] hover:bg-[#FF69B4] hover:text-white"
-                >
-                  <Heart className="w-5 h-5" />
-                </Button>
-              </div>
-
-              {/* Additional info */}
-              <div className="mt-6 p-4 bg-pink-50 rounded-lg">
-                <p className="text-sm text-gray-600">
-                  🚚 Order before 5:00 PM for same-day delivery
-                </p>
               </div>
             </div>
           </div>

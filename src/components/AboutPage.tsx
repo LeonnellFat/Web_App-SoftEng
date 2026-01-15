@@ -48,20 +48,20 @@ export function AboutPage() {
                 About Jean's Flower Shop
               </h2>
               <p className="text-gray-700 mb-4">
-                Jean's Flower Shop has been bringing joy and
-                beauty to Negros Oriental through our exquisite flower
-                arrangements and exceptional service.
+                At Jean’s Flower Shop, we believe that flowers speak a universal language of love, beauty, and emotion.
+                Every arrangement we create is more than just a display of fresh blooms it is a reflection of care, thoughtfulness, and the heartfelt messages our customers wish to share. 
+                Whether you are celebrating a birthday, sending warm wishes, commemorating a milestone, or offering comfort, our flowers are designed to make every moment meaningful.
               </p>
               <p className="text-gray-700 mb-4">
-                Founded by Jean Marie Awid, our shop began with a simple mission:
-                to help people express their feelings through the timeless beauty
-                of flowers. Today, we continue that tradition with the same
-                passion and dedication.
+                Located along Dr. Meciano Road, beside M Lhuillier and in front of Iconcept in Dumaguete City,
+                Jean’s Flower Shop has grown into a trusted place where the community turns to for quality floral arrangements. 
+                With passion and creativity at the heart of everything we do, we take pride in delivering flowers that 
+                not only look beautiful but also carry lasting significance.
               </p>
               <p className="text-gray-700">
-                Every bouquet we create tells a story, celebrates a moment, or
-                brings comfort in difficult times. We are honored to be part of
-                your special occasions.
+                Our shop specializes in a wide range of floral services
+                from classic bouquets and romantic arrangements to 
+                wedding florals, event decorations, and sympathy tributes. 
               </p>
             </motion.div>
             <motion.div

@@ -221,7 +221,7 @@ export function CartPage({ cartItems, onUpdateQuantity, onRemoveItem, onCheckout
                       <span>Home Delivery</span>
                     </div>
                     <p className="text-sm text-gray-600">
-                      Same day delivery - ₱59.00
+                      Delivery Fee - ₱59.00
                     </p>
                   </div>
                 </label>
@@ -238,12 +238,9 @@ export function CartPage({ cartItems, onUpdateQuantity, onRemoveItem, onCheckout
                       <Clock className="w-4 h-4 text-gray-500" />
                       <span>Store Pickup</span>
                     </div>
-                    <p className="text-sm text-gray-600">
-                      Ready in 30-45 minutes - Free
-                    </p>
                     <p className="text-xs text-gray-500 mt-1">
                       <MapPin className="w-3 h-3 inline mr-1" />
-                      123 Garden Street, Flower City
+                      Dr Miciano Rd, Dumaguete City
                     </p>
                     <p className="text-xs text-gray-500">
                       <Clock className="w-3 h-3 inline mr-1" />

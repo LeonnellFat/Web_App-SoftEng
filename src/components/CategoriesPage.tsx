@@ -89,116 +89,7 @@ export function CategoriesPage({ onNavigate }: CategoriesPageProps) {
         </div>
       </section>
 
-      {/* Build Your Own Bouquet Section */}
-      <section className="py-20 bg-gradient-to-br from-pink-50 via-white to-purple-50 relative overflow-hidden">
-        {/* Decorative circles */}
-        <div className="absolute top-10 left-10 w-32 h-32 bg-pink-200/30 rounded-full blur-3xl"></div>
-        <div className="absolute bottom-10 right-10 w-40 h-40 bg-purple-200/30 rounded-full blur-3xl"></div>
-        
-        <div className="max-w-7xl mx-auto px-6 relative z-10">
-          <div className="grid md:grid-cols-2 gap-12 items-center">
-            {/* Left Side - Text Content */}
-            <motion.div
-              initial={{ opacity: 0, x: -30 }}
-              animate={{ opacity: 1, x: 0 }}
-              transition={{ duration: 0.6 }}
-            >
-              <div className="flex items-center gap-2 mb-4">
-                <Sparkles className="w-6 h-6 text-[#FF69B4]" />
-                <span className="text-[#FF69B4] uppercase tracking-wide">Custom Creation</span>
-              </div>
-              
-              <h3
-                className="text-4xl mb-4 text-gray-900"
-                style={{ fontFamily: "'Playfair Display', serif" }}
-              >
-                Build Your Own Bouquet
-              </h3>
-              
-              <p className="text-gray-600 mb-6 text-lg">
-                Design your perfect bouquet from scratch. Choose your size, pick your favorite colors, 
-                and select the flowers that speak to your heart.
-              </p>
 
-              <div className="space-y-4 mb-8">
-                <div className="flex items-start gap-3">
-                  <div className="w-6 h-6 rounded-full bg-[#FF69B4]/20 flex items-center justify-center flex-shrink-0 mt-1">
-                    <span className="text-[#FF69B4]">✓</span>
-                  </div>
-                  <div>
-                    <p className="text-gray-700"><span className="font-medium">Choose Your Size:</span> Small, Medium, or Large</p>
-                  </div>
-                </div>
-                <div className="flex items-start gap-3">
-                  <div className="w-6 h-6 rounded-full bg-[#FF69B4]/20 flex items-center justify-center flex-shrink-0 mt-1">
-                    <span className="text-[#FF69B4]">✓</span>
-                  </div>
-                  <div>
-                    <p className="text-gray-700"><span className="font-medium">Select Your Theme:</span> Pick from vibrant color palettes</p>
-                  </div>
-                </div>
-                <div className="flex items-start gap-3">
-                  <div className="w-6 h-6 rounded-full bg-[#FF69B4]/20 flex items-center justify-center flex-shrink-0 mt-1">
-                    <span className="text-[#FF69B4]">✓</span>
-                  </div>
-                  <div>
-                    <p className="text-gray-700"><span className="font-medium">Pick Your Flowers:</span> Handpick every bloom</p>
-                  </div>
-                </div>
-              </div>
-
-              <Button 
-                onClick={() => onNavigate("custom-bouquet")}
-                className="bg-[#FF69B4] hover:bg-[#FF1493] text-white px-8 py-6 rounded-xl text-lg group"
-              >
-                Start Creating
-                <span className="ml-2 group-hover:translate-x-1 transition-transform inline-block">→</span>
-              </Button>
-            </motion.div>
-
-            {/* Right Side - Visual Preview */}
-            <motion.div
-              initial={{ opacity: 0, x: 30 }}
-              animate={{ opacity: 1, x: 0 }}
-              transition={{ duration: 0.6, delay: 0.2 }}
-              className="relative"
-            >
-              <div className="grid grid-cols-3 gap-4">
-                {/* Size indicators */}
-                <div className="bg-white rounded-2xl p-6 shadow-lg hover:shadow-xl transition-shadow">
-                  <div className="text-center">
-                    <div className="w-12 h-12 mx-auto mb-3 rounded-full bg-gradient-to-br from-pink-200 to-pink-300 flex items-center justify-center">
-                      <span className="text-xl">🌸</span>
-                    </div>
-                    <p className="text-sm font-medium mb-1">Small</p>
-                    <p className="text-xs text-gray-500">1-2 flowers</p>
-                  </div>
-                </div>
-                <div className="bg-white rounded-2xl p-6 shadow-lg hover:shadow-xl transition-shadow">
-                  <div className="text-center">
-                    <div className="w-12 h-12 mx-auto mb-3 rounded-full bg-gradient-to-br from-purple-200 to-purple-300 flex items-center justify-center">
-                      <span className="text-xl">💐</span>
-                    </div>
-                    <p className="text-sm font-medium mb-1">Medium</p>
-                    <p className="text-xs text-gray-500">6 flowers</p>
-                  </div>
-                </div>
-                <div className="bg-white rounded-2xl p-6 shadow-lg hover:shadow-xl transition-shadow">
-                  <div className="text-center">
-                    <div className="w-12 h-12 mx-auto mb-3 rounded-full bg-gradient-to-br from-yellow-200 to-yellow-300 flex items-center justify-center">
-                      <span className="text-xl">🌹</span>
-                    </div>
-                    <p className="text-sm font-medium mb-1">Large</p>
-                    <p className="text-xs text-gray-500">12 flowers</p>
-                  </div>
-                </div>
-              </div>
-
-
-            </motion.div>
-          </div>
-        </div>
-      </section>
 
       {/* By Occasions Section */}
       <section className="py-16 bg-gray-50">
@@ -244,7 +135,12 @@ export function CategoriesPage({ onNavigate }: CategoriesPageProps) {
                   </motion.div>
                   <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/20 to-transparent" />
                   <div className="absolute bottom-0 left-0 right-0 p-6 text-white">
-                    <h3 className="text-xl mb-1">{category.name}</h3>
+                    <h3 className="text-xl mb-2">{category.name}</h3>
+                    {category.description && (
+                      <p className="text-xs text-white/80 mb-2 line-clamp-2">
+                        {category.description}
+                      </p>
+                    )}
                     <p className="text-sm text-white/90">
                       {counts[category.id] || 0} items
                     </p>

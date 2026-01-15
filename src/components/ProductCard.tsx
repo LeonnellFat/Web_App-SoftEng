@@ -11,7 +11,7 @@ export function ProductCard({ name, price, image, badge, onClick }: ProductCardP
     <motion.div
       whileHover={{ y: -5 }}
       transition={{ duration: 0.3 }}
-      className="bg-white rounded-lg overflow-hidden shadow-sm hover:shadow-xl transition-all group cursor-pointer"
+      className="bg-white rounded-lg overflow-hidden shadow-sm hover:shadow-xl transition-all group cursor-pointer h-full flex flex-col"
       onClick={onClick}
     >
       <div className="relative aspect-square overflow-hidden">
@@ -54,8 +54,8 @@ export function ProductCard({ name, price, image, badge, onClick }: ProductCardP
           </span>
         </motion.div>
       </div>
-      <div className="p-4">
-        <h3 className="mb-2">{name}</h3>
+      <div className="p-4 flex flex-col flex-grow">
+        <h3 className="mb-2 line-clamp-2 flex-grow">{name}</h3>
         <span className="text-[#FF69B4]">₱{price.toFixed(2)}</span>
       </div>
     </motion.div>

@@ -14,7 +14,6 @@ import { CreateAccountPage } from "./components/CreateAccountPage";
 import { UserPage } from "./components/UserPage";
 import { CartPage } from "./components/CartPage";
 import { OrderHistoryPage } from "./components/OrderHistoryPage";
-import { CustomBouquetBuilderPage } from "./components/CustomBouquetBuilderPage";
 import { LoginRequiredModal } from "./components/LoginRequiredModal";
 import { Toaster } from "./components/ui/sonner";
 import { toast } from "sonner";
@@ -42,7 +41,7 @@ export interface Order {
   totalAmount: number;
   phone: string;
   date: string;
-  status: "Pending" | "Confirmed" | "Preparing" | "Ready" | "Delivered";
+  status: "Pending" | "Confirmed" | "Preparing" | "Ready" | "OutForDelivery" | "Delivered" | "Completed";
   payment: "Cash" | "Card";
   driver: string;
   driverId?: string;
@@ -70,13 +69,43 @@ export default function App() {
   const [flowerTypes, setFlowerTypes] = useState<FlowerType[]>(initialFlowerTypes);
   const [isInitializing, setIsInitializing] = useState(true);
 
-  // Recover session on app initialization
+  // Initialize app: recover session and load all necessary data
   useEffect(() => {
     let mounted = true;
     
-    const recoverSession = async () => {
+    const initializeApp = async () => {
       try {
-        // Check if there's an active session
+        // Fetch bouquet colors and flower types first (these are needed for admin pages)
+        const { data: colors, error: colorsErr } = await supabase
+          .from('bouquet_colors')
+          .select('id, name, hex_code, description')
+          .order('name', { ascending: true });
+        if (colorsErr) throw colorsErr;
+        const mappedColors = (colors || []).map((c: any) => ({
+          id: c.id,
+          name: c.name,
+          hexCode: c.hex_code ?? '',
+          description: c.description ?? ''
+        }));
+
+        const { data: flowers, error: flowersErr } = await supabase
+          .from('flower_types')
+          .select('id, name, image, category, available')
+          .order('name', { ascending: true });
+        if (flowersErr) throw flowersErr;
+        const mappedFlowers = (flowers || []).map((f: any) => ({
+          id: f.id,
+          name: f.name,
+          image: f.image ?? '',
+          category: f.category ?? '',
+          available: f.available ?? true
+        }));
+
+        if (!mounted) return;
+        setBouquetColors(mappedColors);
+        setFlowerTypes(mappedFlowers);
+
+        // Now recover session
         const { data: { session }, error: sessionError } = await supabase.auth.getSession();
         
         if (sessionError) {
@@ -141,8 +170,7 @@ export default function App() {
               setUserData({
                 fullName: profile.full_name || 'User',
                 email: profile.email || session.user.email || '',
-                phone: profile.phone || '',
-                address: profile.address || ''
+                phone: profile.phone || ''
               });
               // If admin, navigate to admin page
               if (isAdmin) {
@@ -158,8 +186,7 @@ export default function App() {
               setUserData({
                 fullName: profile.full_name || 'User',
                 email: profile.email || session.user.email || '',
-                phone: profile.phone || '',
-                address: profile.address || ''
+                phone: profile.phone || ''
               });
               // If admin, navigate to admin page
               if (isAdmin) {
@@ -169,7 +196,7 @@ export default function App() {
           }
         }
       } catch (err) {
-        console.error('Error in session recovery:', err);
+        console.error('Error in app initialization:', err);
       } finally {
         if (mounted) {
           setIsInitializing(false);
@@ -177,7 +204,7 @@ export default function App() {
       }
     };
 
-    recoverSession();
+    initializeApp();
     return () => { mounted = false; };
   }, []);
 
@@ -185,47 +212,6 @@ export default function App() {
   useEffect(() => {
     window.scrollTo({ top: 0, behavior: 'smooth' });
   }, [currentPage]);
-
-  // Load bouquet colors and flower types from Supabase on mount
-  useEffect(() => {
-    let mounted = true;
-    (async () => {
-      try {
-        const { data: colors, error: colorsErr } = await supabase
-          .from('bouquet_colors')
-          .select('id, name, hex_code, description')
-          .order('name', { ascending: true });
-        if (colorsErr) throw colorsErr;
-        const mappedColors = (colors || []).map((c: any) => ({
-          id: c.id,
-          name: c.name,
-          hexCode: c.hex_code ?? '',
-          description: c.description ?? ''
-        }));
-
-        const { data: flowers, error: flowersErr } = await supabase
-          .from('flower_types')
-          .select('id, name, image, category, available')
-          .order('name', { ascending: true });
-        if (flowersErr) throw flowersErr;
-        const mappedFlowers = (flowers || []).map((f: any) => ({
-          id: f.id,
-          name: f.name,
-          image: f.image ?? '',
-          category: f.category ?? '',
-          available: f.available ?? true
-        }));
-
-        if (!mounted) return;
-        setBouquetColors(mappedColors);
-        setFlowerTypes(mappedFlowers);
-      } catch (err) {
-        console.error('Failed to load admin data', err);
-      }
-    })();
-
-    return () => { mounted = false; };
-  }, []);
 
   const handleNavigate = (page: string, category?: Category) => {
     setCurrentPage(page);
@@ -306,7 +292,15 @@ export default function App() {
     }
   };
 
-  const handleLogout = () => {
+  const handleLogout = async () => {
+    try {
+      // Sign out from Supabase to clear the session
+      await supabase.auth.signOut();
+    } catch (err) {
+      console.error('Error signing out from Supabase:', err);
+    }
+    
+    // Clear local state
     setIsLoggedIn(false);
     setIsAdmin(false);
     setUserId(null);
@@ -417,9 +411,12 @@ export default function App() {
       }
 
       // Build order payload (user_id should match profiles.id)
+      // Generate unique order number using timestamp to avoid duplicates
+      const timestamp = Date.now().toString().slice(-6);
+      const randomSuffix = Math.floor(Math.random() * 1000).toString().padStart(3, '0');
       const orderPayload: any = {
         user_id: user?.id ?? null,
-        order_number: `ORD-${String((orders?.length ?? 0) + 1).padStart(3, '0')}`,
+        order_number: `ORD-${timestamp}${randomSuffix}`,
         total_amount: Math.round(total),
         phone: userData.phone,
         date: new Date().toISOString().split('T')[0],
@@ -530,8 +527,6 @@ export default function App() {
         return <CategoriesPage onNavigate={handleNavigate} />;
       case "about":
         return <AboutPage />;
-      case "custom-bouquet":
-        return <CustomBouquetBuilderPage onBack={() => handleNavigate("categories")} onAddToCart={handleAddToCart} isLoggedIn={isLoggedIn} onShowLoginRequired={() => setShowLoginRequired(true)} bouquetColors={bouquetColors} flowerTypes={flowerTypes} />;
       case "user":
         return <UserPage 
           userName={userData.fullName} 

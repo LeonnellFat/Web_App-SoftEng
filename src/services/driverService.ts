@@ -47,6 +47,7 @@ export async function createDriver(input: CreateDriverInput) {
           full_name: input.fullName,
           phone: input.phone,
           username: input.username,
+          role: 'driver',
         },
       },
     } as any);

@@ -20,9 +20,7 @@ export function AdminLayout({ children, currentSection, onSectionChange, onLogou
   ];
 
   const categoryItems = [
-    { id: "bouquet-colors", label: "Bouquet Color" },
     { id: "categories", label: "Categories" },
-    { id: "flower-types", label: "Flower Type" },
   ];
 
   return (

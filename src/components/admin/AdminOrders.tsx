@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import supabase from "../../services/supabaseClient";
 import { motion } from "motion/react";
 import { Search, Trash2, Check } from "lucide-react";
@@ -23,6 +23,7 @@ export function AdminOrders({ orders, onUpdateOrders }: AdminOrdersProps) {
   const [drivers, setDrivers] = useState<Driver[]>([]);
   const [driversLoading, setDriversLoading] = useState(true);
   const [assigningDriverTo, setAssigningDriverTo] = useState<string | null>(null);
+  const subscriptionRef = useRef<any>(null);
 
   const filteredOrders = orders.filter((order) =>
     Object.values(order).some((value) => {
@@ -33,7 +34,7 @@ export function AdminOrders({ orders, onUpdateOrders }: AdminOrdersProps) {
     })
   );
 
-  const handleUpdateStatus = async (orderId: string, newStatus: "Pending" | "Confirmed" | "Preparing" | "Ready" | "Delivered") => {
+  const handleUpdateStatus = async (orderId: string, newStatus: "Pending" | "Confirmed" | "Preparing" | "Ready" | "OutForDelivery" | "Delivered" | "Completed") => {
     try {
       // Show loading toast
       const toastId = toast.loading('Updating order status...');
@@ -225,29 +226,48 @@ export function AdminOrders({ orders, onUpdateOrders }: AdminOrdersProps) {
       }
 
       // Map to local Order shape
-      const mapped = (ordersData || []).map((o: any) => ({
-        id: o.id,
-        name: o.profiles?.full_name ?? "",
-        orderId: o.order_number ?? o.id,
-        items: (o.order_items || []).map((it: any) => ({ product: productsMap[it.product_id] ?? { id: it.product_id, name: 'Unknown', price: it.price || 0, image: '' }, quantity: it.quantity })),
-        totalAmount: o.total_amount ?? 0,
-        phone: o.phone ?? "",
-        date: o.date ?? (o.created_at ? o.created_at.split('T')[0] : ""),
-        status: o.status ?? 'Pending',
-        payment: o.payment ?? 'Cash',
-        driver: o.driver?.full_name ?? 'Unassigned',
-        driverId: o.driver_id,
-        deliveryAddress: o.delivery_address ?? '',
-        deliveryOption: o.delivery_option ?? 'delivery'
-      }));
+      const mapped = (ordersData || []).map((o: any) => {
+        // Normalize status values from database to match UI expectations
+        let status = o.status ?? 'Pending';
+        
+        // Normalize all status values: convert lowercase and camelCase to PascalCase
+        const statusMap: Record<string, string> = {
+          'pending': 'Pending',
+          'confirmed': 'Confirmed',
+          'preparing': 'Preparing',
+          'ready': 'Ready',
+          'outfordelivery': 'OutForDelivery',
+          'outForDelivery': 'OutForDelivery',
+          'delivered': 'Delivered',
+          'completed': 'Completed'
+        };
+        
+        const normalizedStatus = statusMap[status.toLowerCase()] || status;
+        
+        return {
+          id: o.id,
+          name: o.profiles?.full_name ?? "",
+          orderId: o.order_number ?? o.id,
+          items: (o.order_items || []).map((it: any) => ({ product: productsMap[it.product_id] ?? { id: it.product_id, name: 'Unknown', price: it.price || 0, image: '' }, quantity: it.quantity })),
+          totalAmount: o.total_amount ?? 0,
+          phone: o.phone ?? "",
+          date: o.date ?? (o.created_at ? o.created_at.split('T')[0] : ""),
+          status: normalizedStatus,
+          payment: o.payment ?? 'Cash',
+          driver: o.driver?.full_name ?? 'Unassigned',
+          driverId: o.driver_id,
+          deliveryAddress: o.delivery_address ?? '',
+          deliveryOption: o.delivery_option ?? 'delivery'
+        };
+      });
 
       // Merge DB orders with any existing local/fallback orders so admins don't lose visibility
       const dbIds = new Set(mapped.map((o: any) => o.id));
       const merged = [
         // prefer DB-provided orders first
         ...mapped,
-        // keep any local orders that don't exist in DB yet
-        ...(orders || []).filter((o) => !dbIds.has(o.id)),
+        // keep any local orders that don't exist in DB yet (only orders with UUID format, not timestamp-based IDs)
+        ...(orders || []).filter((o) => !dbIds.has(o.id) && o.id.includes('-')),
       ];
 
       onUpdateOrders(merged);
@@ -276,6 +296,51 @@ export function AdminOrders({ orders, onUpdateOrders }: AdminOrdersProps) {
     // Load once on mount
     fetchOrdersFromDb();
     loadDrivers();
+
+    // Set up Realtime subscription for order status changes
+    const subscription = supabase
+      .channel("orders-updates")
+      .on(
+        "postgres_changes",
+        {
+          event: "UPDATE",
+          schema: "public",
+          table: "orders",
+          filter: "status=in.(OutForDelivery,Delivered)" // Only subscribe to these status changes
+        },
+        (payload) => {
+          const updatedOrder = payload.new;
+          
+          // Normalize status values
+          let normalizedStatus = updatedOrder.status;
+          if (normalizedStatus === "outForDelivery") normalizedStatus = "OutForDelivery";
+          
+          // Update local state with the new status
+          onUpdateOrders(
+            orders.map((order) =>
+              order.id === updatedOrder.id
+                ? { ...order, status: normalizedStatus }
+                : order
+            )
+          );
+
+          // Show notification
+          const statusDisplay = normalizedStatus === "OutForDelivery" ? "Out for Delivery" : normalizedStatus;
+          toast.success(`Order ${updatedOrder.order_number || updatedOrder.id} status updated to ${statusDisplay}`, {
+            duration: 3000,
+          });
+        }
+      )
+      .subscribe();
+
+    subscriptionRef.current = subscription;
+
+    // Cleanup subscription on unmount
+    return () => {
+      if (subscriptionRef.current) {
+        supabase.removeChannel(subscriptionRef.current);
+      }
+    };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -347,6 +412,7 @@ export function AdminOrders({ orders, onUpdateOrders }: AdminOrdersProps) {
                 <th className="px-3 sm:px-4 py-3 text-left text-xs sm:text-sm text-gray-600 whitespace-nowrap">Order Date</th>
                 <th className="px-3 sm:px-4 py-3 text-left text-xs sm:text-sm text-gray-600 whitespace-nowrap">Status</th>
                 <th className="px-3 sm:px-4 py-3 text-left text-xs sm:text-sm text-gray-600 whitespace-nowrap">Payment</th>
+                <th className="px-3 sm:px-4 py-3 text-left text-xs sm:text-sm text-gray-600 whitespace-nowrap">Order Option</th>
                 <th className="px-3 sm:px-4 py-3 text-left text-xs sm:text-sm text-gray-600 whitespace-nowrap">Driver</th>
                 <th className="px-3 sm:px-4 py-3 text-left text-xs sm:text-sm text-gray-600 whitespace-nowrap">Action</th>
               </tr>
@@ -377,8 +443,10 @@ export function AdminOrders({ orders, onUpdateOrders }: AdminOrdersProps) {
                         value={order.status}
                         onChange={(e) => handleUpdateStatus(order.id, e.target.value as any)}
                         className={`px-2 sm:px-3 py-1 rounded-full text-xs border-0 cursor-pointer whitespace-nowrap ${
-                          order.status === "Delivered"
+                          order.status === "Delivered" || order.status === "Completed"
                             ? "bg-green-100 text-green-800"
+                            : order.status === "OutForDelivery"
+                            ? "bg-orange-100 text-orange-800"
                             : order.status === "Ready"
                             ? "bg-blue-100 text-blue-800"
                             : order.status === "Preparing"
@@ -392,12 +460,30 @@ export function AdminOrders({ orders, onUpdateOrders }: AdminOrdersProps) {
                         <option value="Confirmed">Confirmed</option>
                         <option value="Preparing">Preparing</option>
                         <option value="Ready">Ready</option>
-                        <option value="Delivered">Delivered</option>
+                        {order.deliveryOption === "delivery" ? (
+                          <>
+                            <option value="OutForDelivery">Out For Delivery</option>
+                            <option value="Delivered">Delivered</option>
+                          </>
+                        ) : (
+                          <option value="Completed">Completed</option>
+                        )}
                       </select>
                     </td>
                     <td className="px-3 sm:px-4 py-3 text-xs sm:text-sm whitespace-nowrap">{order.payment}</td>
                     <td className="px-3 sm:px-4 py-3 text-xs sm:text-sm whitespace-nowrap">
-                      {order.status === "Confirmed" || order.driver !== "Unassigned" ? (
+                      <span className={`px-2 py-1 rounded-full text-xs font-medium ${
+                        order.deliveryOption === 'delivery'
+                          ? 'bg-blue-100 text-blue-800'
+                          : 'bg-orange-100 text-orange-800'
+                      }`}>
+                        {order.deliveryOption === 'delivery' ? '🚗 Delivery' : '🏠 Pickup'}
+                      </span>
+                    </td>
+                    <td className="px-3 sm:px-4 py-3 text-xs sm:text-sm whitespace-nowrap">
+                      {order.deliveryOption === 'pickup' ? (
+                        <span className="text-gray-500 text-xs italic">No driver needed</span>
+                      ) : order.status === "Confirmed" || order.driver !== "Unassigned" ? (
                         <select
                           value={order.driverId || ""}
                           onChange={(e) => handleAssignDriver(order.id, e.target.value)}

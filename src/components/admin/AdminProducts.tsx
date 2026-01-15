@@ -220,7 +220,7 @@ export function AdminProducts() {
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: index * 0.05 }}
-            className="bg-white rounded-lg border border-gray-200 overflow-hidden group hover:shadow-lg transition-shadow"
+            className="bg-white rounded-lg border border-gray-200 overflow-hidden group hover:shadow-lg transition-shadow h-full flex flex-col"
           >
             <div className="relative aspect-square overflow-hidden">
               <img
@@ -234,10 +234,10 @@ export function AdminProducts() {
                 </div>
               )}
             </div>
-            <div className="p-4">
-              <h3 className="mb-2">{product.name}</h3>
-              <p className="text-[#FF69B4] mb-3">₱ {Number(product.price).toFixed(2)}</p>
-              <div className="flex flex-wrap gap-1 mb-4">
+            <div className="p-4 flex flex-col flex-grow">
+              <h3 className="mb-2 line-clamp-2 h-14 flex items-start">{product.name}</h3>
+              <p className="text-[#FF69B4] mb-3 flex-shrink-0">₱ {Number(product.price).toFixed(2)}</p>
+              <div className="flex flex-wrap gap-1 mb-auto min-h-6 flex-shrink-0">
                 {product.categories.slice(0, 2).map((cat) => (
                   <span key={cat} className="px-2 py-1 bg-gray-100 text-gray-600 text-xs rounded">
                     {cat}
@@ -249,7 +249,7 @@ export function AdminProducts() {
                   </span>
                 )}
               </div>
-              <div className="flex gap-2">
+              <div className="flex gap-2 mt-auto flex-shrink-0">
                 <Button
                   onClick={() => handleOpenModal(product)}
                   variant="outline"

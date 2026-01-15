@@ -51,7 +51,7 @@ export function AdminReports({ orders }: AdminReportsProps) {
   const revenueStats = [
     { label: "Total Orders", value: String(totalOrders), color: "from-teal-400 to-teal-500", icon: ShoppingCart },
     { label: "Cash", value: `₱${totalRevenue.toFixed(2)}`, color: "from-yellow-400 to-yellow-500" },
-    { label: "No. of Deliveries", value: String(totalDeliveries), color: "from-green-400 to-green-500", icon: FileText },
+    { label: "No. Delivered", value: String(totalDeliveries), color: "from-green-400 to-green-500", icon: FileText },
   ];
 
   // users section removed per design
