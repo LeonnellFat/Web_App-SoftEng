@@ -45,6 +45,7 @@ export interface Order {
   status: "Pending" | "Confirmed" | "Preparing" | "Ready" | "Delivered";
   payment: "Cash" | "Card";
   driver: string;
+  driverId?: string;
   deliveryAddress?: string;
   deliveryOption: "delivery" | "pickup";
 }
@@ -67,6 +68,118 @@ export default function App() {
   });
   const [bouquetColors, setBouquetColors] = useState<BouquetColor[]>(initialBouquetColors);
   const [flowerTypes, setFlowerTypes] = useState<FlowerType[]>(initialFlowerTypes);
+  const [isInitializing, setIsInitializing] = useState(true);
+
+  // Recover session on app initialization
+  useEffect(() => {
+    let mounted = true;
+    
+    const recoverSession = async () => {
+      try {
+        // Check if there's an active session
+        const { data: { session }, error: sessionError } = await supabase.auth.getSession();
+        
+        if (sessionError) {
+          console.error('Error recovering session:', sessionError);
+          setIsInitializing(false);
+          return;
+        }
+
+        if (session?.user) {
+          // User is logged in, recover their session
+          const userId = session.user.id;
+          
+          // Fetch user profile to get full name and other details
+          const { data: profile, error: profileError } = await supabase
+            .from('profiles')
+            .select('id, full_name, email, phone, role')
+            .eq('id', userId)
+            .single();
+
+          if (profileError || !profile) {
+            console.error('Error fetching profile:', profileError);
+            setIsInitializing(false);
+            return;
+          }
+
+          // Check if user is admin
+          const isAdmin = profile.role === 'admin';
+
+          // Load user's cart
+          try {
+            const cartData = await fetchUserCart(userId);
+            const cartItems: CartItem[] = [];
+            
+            if (cartData.length > 0) {
+              const { data: productsFromDb } = await supabase
+                .from('products')
+                .select('*');
+              
+              cartData.forEach(item => {
+                const product = productsFromDb?.find(p => p.id === item.product_id);
+                if (product) {
+                  cartItems.push({
+                    product: {
+                      id: product.id,
+                      name: product.name,
+                      price: product.price,
+                      image: product.image || '',
+                      categories: product.categories ? [product.categories] : [],
+                      badge: product.badge
+                    },
+                    quantity: item.quantity
+                  });
+                }
+              });
+            }
+
+            if (mounted) {
+              setCartItems(cartItems);
+              setIsLoggedIn(true);
+              setUserId(userId);
+              setIsAdmin(isAdmin);
+              setUserData({
+                fullName: profile.full_name || 'User',
+                email: profile.email || session.user.email || '',
+                phone: profile.phone || '',
+                address: profile.address || ''
+              });
+              // If admin, navigate to admin page
+              if (isAdmin) {
+                setCurrentPage("admin");
+              }
+            }
+          } catch (err) {
+            console.error('Error loading cart during session recovery:', err);
+            if (mounted) {
+              setIsLoggedIn(true);
+              setUserId(userId);
+              setIsAdmin(isAdmin);
+              setUserData({
+                fullName: profile.full_name || 'User',
+                email: profile.email || session.user.email || '',
+                phone: profile.phone || '',
+                address: profile.address || ''
+              });
+              // If admin, navigate to admin page
+              if (isAdmin) {
+                setCurrentPage("admin");
+              }
+            }
+          }
+        }
+      } catch (err) {
+        console.error('Error in session recovery:', err);
+      } finally {
+        if (mounted) {
+          setIsInitializing(false);
+        }
+      }
+    };
+
+    recoverSession();
+    return () => { mounted = false; };
+  }, []);
 
   // Scroll to top when page changes
   useEffect(() => {
@@ -472,6 +585,18 @@ export default function App() {
     return (
       <div className="min-h-screen">
         {renderPage()}
+      </div>
+    );
+  }
+
+  // Show loading state while recovering session
+  if (isInitializing) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gradient-to-b from-pink-50 to-white">
+        <div className="text-center">
+          <div className="inline-block animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-pink-500 mb-4"></div>
+          <p className="text-gray-600">Loading...</p>
+        </div>
       </div>
     );
   }

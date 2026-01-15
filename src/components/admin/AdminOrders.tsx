@@ -103,20 +103,20 @@ export function AdminOrders({ orders, onUpdateOrders }: AdminOrdersProps) {
 
       const toastId = toast.loading('Assigning driver...');
 
-      // Find the driver to get their profileId (which is what the foreign key expects)
-      const selectedDriver = drivers.find(d => d.id === driverId);
+      // Find the driver to get their name for local state update
+      const selectedDriver = drivers.find(d => d.profileId === driverId);
       if (!selectedDriver) {
         throw new Error('Driver not found');
       }
 
-      // Use the service function
-      const { error } = await assignDriverToOrder(orderId, selectedDriver.profileId);
+      // Use the service function - driverId is already the profileId
+      const { error } = await assignDriverToOrder(orderId, driverId);
 
       if (error) throw error;
 
-      // If successful, update local state
+      // If successful, update local state with driver name and ID
       onUpdateOrders(orders.map(order => 
-        order.id === orderId ? { ...order, driver: selectedDriver.name } : order
+        order.id === orderId ? { ...order, driver: selectedDriver.name, driverId: selectedDriver.profileId } : order
       ));
 
       toast.success('Driver assigned successfully', {
@@ -203,10 +203,10 @@ export function AdminOrders({ orders, onUpdateOrders }: AdminOrdersProps) {
     setLoading(true);
     setError(null);
     try {
-      // Get orders with order_items and basic profile info
+      // Get orders with order_items, user profile, and driver profile info
       const { data: ordersData, error: ordersErr } = await supabase
         .from("orders")
-        .select(`*, order_items(*) , profiles:user_id(full_name)`) 
+        .select(`*, order_items(*) , profiles:user_id(full_name), driver:driver_id(full_name)`) 
         .order("created_at", { ascending: false });
 
       if (ordersErr) throw ordersErr;
@@ -235,7 +235,8 @@ export function AdminOrders({ orders, onUpdateOrders }: AdminOrdersProps) {
         date: o.date ?? (o.created_at ? o.created_at.split('T')[0] : ""),
         status: o.status ?? 'Pending',
         payment: o.payment ?? 'Cash',
-        driver: o.driver_id ?? 'Unassigned',
+        driver: o.driver?.full_name ?? 'Unassigned',
+        driverId: o.driver_id,
         deliveryAddress: o.delivery_address ?? '',
         deliveryOption: o.delivery_option ?? 'delivery'
       }));
@@ -398,18 +399,14 @@ export function AdminOrders({ orders, onUpdateOrders }: AdminOrdersProps) {
                     <td className="px-3 sm:px-4 py-3 text-xs sm:text-sm whitespace-nowrap">
                       {order.status === "Confirmed" || order.driver !== "Unassigned" ? (
                         <select
-                          value={
-                            order.driver === "Unassigned" 
-                              ? "" 
-                              : drivers.find(d => d.name === order.driver)?.id || ""
-                          }
+                          value={order.driverId || ""}
                           onChange={(e) => handleAssignDriver(order.id, e.target.value)}
                           disabled={driversLoading}
                           className="px-2 sm:px-3 py-1 rounded-md text-xs border border-gray-300 cursor-pointer hover:border-gray-400 disabled:opacity-50 disabled:cursor-not-allowed"
                         >
                           <option value="">Select a driver...</option>
                           {drivers.map((driver) => (
-                            <option key={driver.id} value={driver.id}>
+                            <option key={driver.id} value={driver.profileId}>
                               {driver.name}
                             </option>
                           ))}
