@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { motion } from "motion/react";
-import { Plus, Edit2, Trash2 } from "lucide-react";
+import { Plus, Edit2, Trash2, ChevronLeft, ChevronRight } from "lucide-react";
 import { Button } from "../ui/button";
 import { Input } from "../ui/input";
 import { Label } from "../ui/label";
@@ -17,11 +17,35 @@ export function AdminBouquetColors({ colors, onUpdateColors }: AdminBouquetColor
 
   const [showAddForm, setShowAddForm] = useState(false);
   const [editingColor, setEditingColor] = useState<BouquetColor | null>(null);
+  const [currentPage, setCurrentPage] = useState(0);
+  const ITEMS_PER_PAGE = 8;
   const [formData, setFormData] = useState({
     name: "",
     hexCode: "",
     description: ""
   });
+
+  const getPaginatedColors = () => {
+    const startIndex = currentPage * ITEMS_PER_PAGE;
+    const endIndex = startIndex + ITEMS_PER_PAGE;
+    return colors.slice(startIndex, endIndex);
+  };
+
+  const getTotalPages = () => {
+    return Math.ceil(colors.length / ITEMS_PER_PAGE);
+  };
+
+  const handleNextPage = () => {
+    if (currentPage < getTotalPages() - 1) {
+      setCurrentPage(currentPage + 1);
+    }
+  };
+
+  const handlePreviousPage = () => {
+    if (currentPage > 0) {
+      setCurrentPage(currentPage - 1);
+    }
+  };
 
   const handleSaveColor = () => {
     if (formData.name && formData.hexCode && formData.description) {
@@ -57,6 +81,7 @@ export function AdminBouquetColors({ colors, onUpdateColors }: AdminBouquetColor
         } finally {
           setFormData({ name: '', hexCode: '', description: '' });
           setShowAddForm(false);
+          setCurrentPage(0);
         }
       })();
     }
@@ -79,6 +104,7 @@ export function AdminBouquetColors({ colors, onUpdateColors }: AdminBouquetColor
         if (error) throw error;
         onUpdateColors(colors.filter(color => color.id !== id));
         toast.success('Color deleted');
+        setCurrentPage(0);
       } catch (err: any) {
         console.error('Failed to delete color', err);
         toast.error(err?.message || 'Failed to delete color');
@@ -185,8 +211,8 @@ export function AdminBouquetColors({ colors, onUpdateColors }: AdminBouquetColor
       )}
 
       {/* Colors Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-        {colors.map((color, index) => (
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
+        {getPaginatedColors().map((color, index) => (
           <motion.div
             key={color.id}
             initial={{ opacity: 0, y: 20 }}
@@ -242,6 +268,33 @@ export function AdminBouquetColors({ colors, onUpdateColors }: AdminBouquetColor
           </motion.div>
         ))}
       </div>
+
+      {/* Pagination Controls */}
+      {getTotalPages() > 1 && (
+        <div className="flex items-center justify-center gap-4">
+          <Button
+            onClick={handlePreviousPage}
+            disabled={currentPage === 0}
+            variant="outline"
+            className="flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            <ChevronLeft className="w-4 h-4" />
+            Previous
+          </Button>
+          <span className="text-sm text-gray-600">
+            Page {currentPage + 1} of {getTotalPages()}
+          </span>
+          <Button
+            onClick={handleNextPage}
+            disabled={currentPage === getTotalPages() - 1}
+            variant="outline"
+            className="flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            Next
+            <ChevronRight className="w-4 h-4" />
+          </Button>
+        </div>
+      )}
     </div>
   );
 }

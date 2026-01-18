@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { motion } from "motion/react";
-import { Plus, Edit2, Trash2, Search } from "lucide-react";
+import { Plus, Edit2, Trash2, Search, ChevronLeft, ChevronRight } from "lucide-react";
 import { Button } from "../ui/button";
 import { Input } from "../ui/input";
 import { Label } from "../ui/label";
@@ -19,6 +19,8 @@ export function AdminFlowerTypes({ flowers, onUpdateFlowers }: AdminFlowerTypesP
   const [showAddForm, setShowAddForm] = useState(false);
   const [editingFlower, setEditingFlower] = useState<FlowerType | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
+  const [currentPage, setCurrentPage] = useState(0);
+  const ITEMS_PER_PAGE = 8;
   const [formData, setFormData] = useState({
     name: "",
     image: "",
@@ -29,6 +31,28 @@ export function AdminFlowerTypes({ flowers, onUpdateFlowers }: AdminFlowerTypesP
   const filteredFlowers = flowers.filter((flower) =>
     flower.name.toLowerCase().includes(searchQuery.toLowerCase())
   );
+
+  const getPaginatedFlowers = () => {
+    const startIndex = currentPage * ITEMS_PER_PAGE;
+    const endIndex = startIndex + ITEMS_PER_PAGE;
+    return filteredFlowers.slice(startIndex, endIndex);
+  };
+
+  const getTotalPages = () => {
+    return Math.ceil(filteredFlowers.length / ITEMS_PER_PAGE);
+  };
+
+  const handleNextPage = () => {
+    if (currentPage < getTotalPages() - 1) {
+      setCurrentPage(currentPage + 1);
+    }
+  };
+
+  const handlePreviousPage = () => {
+    if (currentPage > 0) {
+      setCurrentPage(currentPage - 1);
+    }
+  };
 
   const handleSaveFlower = () => {
     if (formData.name && formData.image) {
@@ -62,6 +86,7 @@ export function AdminFlowerTypes({ flowers, onUpdateFlowers }: AdminFlowerTypesP
         } finally {
           setFormData({ name: '', image: '', category: '', available: true });
           setShowAddForm(false);
+          setCurrentPage(0);
         }
       })();
     }
@@ -85,6 +110,7 @@ export function AdminFlowerTypes({ flowers, onUpdateFlowers }: AdminFlowerTypesP
         if (error) throw error;
         onUpdateFlowers(flowers.filter(flower => flower.id !== id));
         toast.success('Flower deleted');
+        setCurrentPage(0);
       } catch (err: any) {
         console.error('Failed to delete flower', err);
         toast.error(err?.message || 'Failed to delete flower');
@@ -216,8 +242,8 @@ export function AdminFlowerTypes({ flowers, onUpdateFlowers }: AdminFlowerTypesP
       )}
 
       {/* Flowers Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-        {filteredFlowers.map((flower, index) => (
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 mb-8">
+        {getPaginatedFlowers().map((flower, index) => (
           <motion.div
             key={flower.id}
             initial={{ opacity: 0, y: 20 }}
@@ -276,6 +302,33 @@ export function AdminFlowerTypes({ flowers, onUpdateFlowers }: AdminFlowerTypesP
           </motion.div>
         ))}
       </div>
+
+      {/* Pagination Controls */}
+      {getTotalPages() > 1 && (
+        <div className="flex items-center justify-center gap-4 mb-8">
+          <Button
+            onClick={handlePreviousPage}
+            disabled={currentPage === 0}
+            variant="outline"
+            className="flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            <ChevronLeft className="w-4 h-4" />
+            Previous
+          </Button>
+          <span className="text-sm text-gray-600">
+            Page {currentPage + 1} of {getTotalPages()}
+          </span>
+          <Button
+            onClick={handleNextPage}
+            disabled={currentPage === getTotalPages() - 1}
+            variant="outline"
+            className="flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            Next
+            <ChevronRight className="w-4 h-4" />
+          </Button>
+        </div>
+      )}
 
       {filteredFlowers.length === 0 && (
         <div className="text-center py-12 text-gray-500">

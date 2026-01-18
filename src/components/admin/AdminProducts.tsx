@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { motion } from "motion/react";
-import { Plus, Edit, Trash2, X } from "lucide-react";
+import { Plus, Edit, Trash2, X, ChevronLeft, ChevronRight } from "lucide-react";
 import { Button } from "../ui/button";
 import { Input } from "../ui/input";
 import { Label } from "../ui/label";
@@ -28,6 +28,8 @@ export function AdminProducts() {
   const [error, setError] = useState<string | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingProduct, setEditingProduct] = useState<ProductType | null>(null);
+  const [currentPage, setCurrentPage] = useState(0);
+  const ITEMS_PER_PAGE = 8;
   const [formData, setFormData] = useState({
     name: "",
     price: "",
@@ -62,6 +64,28 @@ export function AdminProducts() {
   const handleCloseModal = () => {
     setIsModalOpen(false);
     setEditingProduct(null);
+  };
+
+  const getPaginatedProducts = () => {
+    const startIndex = currentPage * ITEMS_PER_PAGE;
+    const endIndex = startIndex + ITEMS_PER_PAGE;
+    return products.slice(startIndex, endIndex);
+  };
+
+  const getTotalPages = () => {
+    return Math.ceil(products.length / ITEMS_PER_PAGE);
+  };
+
+  const handleNextPage = () => {
+    if (currentPage < getTotalPages() - 1) {
+      setCurrentPage(currentPage + 1);
+    }
+  };
+
+  const handlePreviousPage = () => {
+    if (currentPage > 0) {
+      setCurrentPage(currentPage - 1);
+    }
   };
 
   async function fetchProducts() {
@@ -160,6 +184,7 @@ export function AdminProducts() {
       } finally {
         setLoading(false);
         handleCloseModal();
+        setCurrentPage(0);
       }
     })();
   };
@@ -178,6 +203,7 @@ export function AdminProducts() {
         setError(err?.message ?? String(err));
       } finally {
         setLoading(false);
+        setCurrentPage(0);
       }
     })();
   };
@@ -213,8 +239,8 @@ export function AdminProducts() {
       </div>
 
       {/* Products Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-        {products.map((product, index) => (
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6 mb-8">
+        {getPaginatedProducts().map((product, index) => (
           <motion.div
             key={product.id}
             initial={{ opacity: 0, y: 20 }}
@@ -273,6 +299,33 @@ export function AdminProducts() {
           </motion.div>
         ))}
       </div>
+
+      {/* Pagination Controls */}
+      {getTotalPages() > 1 && (
+        <div className="flex items-center justify-center gap-4 mb-8">
+          <Button
+            onClick={handlePreviousPage}
+            disabled={currentPage === 0}
+            variant="outline"
+            className="flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            <ChevronLeft className="w-4 h-4" />
+            Previous
+          </Button>
+          <span className="text-sm text-gray-600">
+            Page {currentPage + 1} of {getTotalPages()}
+          </span>
+          <Button
+            onClick={handleNextPage}
+            disabled={currentPage === getTotalPages() - 1}
+            variant="outline"
+            className="flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            Next
+            <ChevronRight className="w-4 h-4" />
+          </Button>
+        </div>
+      )}
 
       {/* Add/Edit Modal */}
       {isModalOpen && (
