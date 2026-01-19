@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from "react";
 import supabase from "../../services/supabaseClient";
 import { motion } from "motion/react";
-import { Search, Trash2, Check } from "lucide-react";
+import { Search, Trash2, Check, ChevronDown, X } from "lucide-react";
 import { Button } from "../ui/button";
 import { Input } from "../ui/input";
 import { toast, Toaster } from "sonner";
@@ -23,6 +23,7 @@ export function AdminOrders({ orders, onUpdateOrders }: AdminOrdersProps) {
   const [drivers, setDrivers] = useState<Driver[]>([]);
   const [driversLoading, setDriversLoading] = useState(true);
   const [assigningDriverTo, setAssigningDriverTo] = useState<string | null>(null);
+  const [selectedOrderForItems, setSelectedOrderForItems] = useState<Order | null>(null);
   const subscriptionRef = useRef<any>(null);
 
   const filteredOrders = orders.filter((order) =>
@@ -36,6 +37,15 @@ export function AdminOrders({ orders, onUpdateOrders }: AdminOrdersProps) {
 
   const handleUpdateStatus = async (orderId: string, newStatus: "Pending" | "Confirmed" | "Preparing" | "Ready" | "OutForDelivery" | "Delivered" | "Completed") => {
     try {
+      // Find the order to check its current status
+      const order = orders.find(o => o.id === orderId);
+      
+      // Prevent status change if order is still Pending
+      if (order?.status === "Pending") {
+        toast.error('Please accept the order first before changing its status');
+        return;
+      }
+      
       // Show loading toast
       const toastId = toast.loading('Updating order status...');
       
@@ -399,22 +409,22 @@ export function AdminOrders({ orders, onUpdateOrders }: AdminOrdersProps) {
         animate={{ opacity: 1, y: 0 }}
         className="bg-white rounded-lg border border-gray-200 overflow-hidden"
       >
-        <div className="overflow-x-auto">
-          <table className="w-full min-w-max">
+        <div className="overflow-x-auto scrollbar-thin scrollbar-thumb-gray-300 scrollbar-track-gray-100">
+          <table className="w-full">
             <thead className="bg-gray-50 border-b border-gray-200 sticky top-0">
               <tr>
-                <th className="px-3 sm:px-4 py-3 text-left text-xs sm:text-sm text-gray-600 whitespace-nowrap">#</th>
-                <th className="px-3 sm:px-4 py-3 text-left text-xs sm:text-sm text-gray-600 whitespace-nowrap">Name</th>
-                <th className="px-3 sm:px-4 py-3 text-left text-xs sm:text-sm text-gray-600 whitespace-nowrap">Order Id</th>
-                <th className="px-3 sm:px-4 py-3 text-left text-xs sm:text-sm text-gray-600 whitespace-nowrap">Items</th>
-                <th className="px-3 sm:px-4 py-3 text-left text-xs sm:text-sm text-gray-600 whitespace-nowrap">Amount</th>
-                <th className="px-3 sm:px-4 py-3 text-left text-xs sm:text-sm text-gray-600 whitespace-nowrap">Phone</th>
-                <th className="px-3 sm:px-4 py-3 text-left text-xs sm:text-sm text-gray-600 whitespace-nowrap">Order Date</th>
-                <th className="px-3 sm:px-4 py-3 text-left text-xs sm:text-sm text-gray-600 whitespace-nowrap">Status</th>
-                <th className="px-3 sm:px-4 py-3 text-left text-xs sm:text-sm text-gray-600 whitespace-nowrap">Payment</th>
-                <th className="px-3 sm:px-4 py-3 text-left text-xs sm:text-sm text-gray-600 whitespace-nowrap">Order Option</th>
-                <th className="px-3 sm:px-4 py-3 text-left text-xs sm:text-sm text-gray-600 whitespace-nowrap">Driver</th>
-                <th className="px-3 sm:px-4 py-3 text-left text-xs sm:text-sm text-gray-600 whitespace-nowrap">Action</th>
+                <th className="px-3 py-3 text-left text-xs font-semibold text-gray-600 whitespace-nowrap w-8">#</th>
+                <th className="px-3 py-3 text-left text-xs font-semibold text-gray-600 whitespace-nowrap">Name</th>
+                <th className="px-3 py-3 text-left text-xs font-semibold text-gray-600 whitespace-nowrap">Order Id</th>
+                <th className="px-3 py-3 text-left text-xs font-semibold text-gray-600 whitespace-nowrap">Items</th>
+                <th className="px-3 py-3 text-left text-xs font-semibold text-gray-600 whitespace-nowrap">Amount</th>
+                <th className="px-3 py-3 text-left text-xs font-semibold text-gray-600 whitespace-nowrap hidden lg:table-cell">Phone</th>
+                <th className="px-3 py-3 text-left text-xs font-semibold text-gray-600 whitespace-nowrap">Order Date</th>
+                <th className="px-3 py-3 text-left text-xs font-semibold text-gray-600 whitespace-nowrap">Status</th>
+                <th className="px-3 py-3 text-left text-xs font-semibold text-gray-600 whitespace-nowrap hidden md:table-cell">Payment</th>
+                <th className="px-3 py-3 text-left text-xs font-semibold text-gray-600 whitespace-nowrap">Option</th>
+                <th className="px-3 py-3 text-left text-xs font-semibold text-gray-600 whitespace-nowrap hidden xl:table-cell">Driver</th>
+                <th className="px-3 py-3 text-left text-xs font-semibold text-gray-600 whitespace-nowrap">Action</th>
               </tr>
             </thead>
             <tbody>
@@ -427,70 +437,92 @@ export function AdminOrders({ orders, onUpdateOrders }: AdminOrdersProps) {
                     transition={{ delay: index * 0.05 }}
                     className="border-b border-gray-100 hover:bg-gray-50 transition-colors"
                   >
-                    <td className="px-3 sm:px-4 py-3 text-xs sm:text-sm whitespace-nowrap">{index + 1}</td>
-                    <td className="px-3 sm:px-4 py-3 text-xs sm:text-sm whitespace-nowrap max-w-xs truncate">{order.name}</td>
-                    <td className="px-3 sm:px-4 py-3 text-xs sm:text-sm whitespace-nowrap">{order.orderId}</td>
-                    <td className="px-3 sm:px-4 py-3 text-xs sm:text-sm max-w-sm">
-                      <div className="max-h-12 overflow-y-auto text-ellipsis">
-                        {order.items.map(item => item.product.name).join(", ")}
-                      </div>
+                    <td className="px-3 py-3 text-xs whitespace-nowrap">{index + 1}</td>
+                    <td className="px-3 py-3 text-xs whitespace-nowrap font-medium text-gray-700">
+                      <span className="truncate max-w-[120px] inline-block" title={order.name}>{order.name}</span>
                     </td>
-                    <td className="px-3 sm:px-4 py-3 text-xs sm:text-sm whitespace-nowrap font-medium">₱{order.totalAmount.toFixed(2)}</td>
-                    <td className="px-3 sm:px-4 py-3 text-xs sm:text-sm whitespace-nowrap">{order.phone}</td>
-                    <td className="px-3 sm:px-4 py-3 text-xs sm:text-sm whitespace-nowrap">{order.date}</td>
-                    <td className="px-3 sm:px-4 py-3 whitespace-nowrap">
-                      <select
-                        value={order.status}
-                        onChange={(e) => handleUpdateStatus(order.id, e.target.value as any)}
-                        className={`px-2 sm:px-3 py-1 rounded-full text-xs border-0 cursor-pointer whitespace-nowrap ${
-                          order.status === "Delivered" || order.status === "Completed"
-                            ? "bg-green-100 text-green-800"
-                            : order.status === "OutForDelivery"
-                            ? "bg-orange-100 text-orange-800"
-                            : order.status === "Ready"
-                            ? "bg-blue-100 text-blue-800"
-                            : order.status === "Preparing"
-                            ? "bg-purple-100 text-purple-800"
-                            : order.status === "Confirmed"
-                            ? "bg-teal-100 text-teal-800"
-                            : "bg-yellow-100 text-yellow-800"
-                        }`}
+                    <td className="px-3 py-3 text-xs whitespace-nowrap text-gray-600">{order.orderId}</td>
+                    <td className="px-3 py-3 text-xs">
+                      <button
+                        onClick={() => setSelectedOrderForItems(order)}
+                        className="flex items-center gap-1 px-2 py-1.5 bg-blue-50 hover:bg-blue-100 text-blue-700 rounded-md transition-colors font-medium text-xs whitespace-nowrap"
+                        title={`${order.items.length} ${order.items.length === 1 ? 'item' : 'items'}`}
                       >
-                        <option value="Pending">Pending</option>
-                        <option value="Confirmed">Confirmed</option>
-                        <option value="Preparing">Preparing</option>
-                        <option value="Ready">Ready</option>
-                        {order.deliveryOption === "delivery" ? (
-                          <>
-                            <option value="OutForDelivery">Out For Delivery</option>
-                            <option value="Delivered">Delivered</option>
-                          </>
-                        ) : (
-                          <option value="Completed">Completed</option>
-                        )}
-                      </select>
+                        <ChevronDown size={14} />
+                        {order.items.length}
+                      </button>
                     </td>
-                    <td className="px-3 sm:px-4 py-3 text-xs sm:text-sm whitespace-nowrap">{order.payment}</td>
-                    <td className="px-3 sm:px-4 py-3 text-xs sm:text-sm whitespace-nowrap">
-                      <span className={`px-2 py-1 rounded-full text-xs font-medium ${
+                    <td className="px-3 py-3 text-xs whitespace-nowrap font-semibold text-gray-900">₱{order.totalAmount.toFixed(2)}</td>
+                    <td className="px-3 py-3 text-xs whitespace-nowrap text-gray-600 hidden lg:table-cell">
+                      <span className="truncate max-w-[100px] inline-block" title={order.phone}>{order.phone}</span>
+                    </td>
+                    <td className="px-3 py-3 text-xs whitespace-nowrap text-gray-600">{order.date}</td>
+                    <td className="px-3 py-3 whitespace-nowrap">
+                      {order.status === "Pending" ? (
+                        <div className="flex flex-col gap-1">
+                          <select
+                            value={order.status}
+                            disabled
+                            className="px-2 py-1 rounded-full text-xs border-0 cursor-not-allowed bg-yellow-100 text-yellow-800 font-medium whitespace-nowrap opacity-60"
+                          >
+                            <option value="Pending">Pending</option>
+                          </select>
+                          <span className="text-xs text-gray-500 italic">Accept to change</span>
+                        </div>
+                      ) : (
+                        <select
+                          value={order.status}
+                          onChange={(e) => handleUpdateStatus(order.id, e.target.value as any)}
+                          className={`px-2 py-1 rounded-full text-xs border-0 cursor-pointer whitespace-nowrap font-medium ${
+                            order.status === "Delivered" || order.status === "Completed"
+                              ? "bg-green-100 text-green-800"
+                              : order.status === "OutForDelivery"
+                              ? "bg-orange-100 text-orange-800"
+                              : order.status === "Ready"
+                              ? "bg-blue-100 text-blue-800"
+                              : order.status === "Preparing"
+                              ? "bg-purple-100 text-purple-800"
+                              : order.status === "Confirmed"
+                              ? "bg-teal-100 text-teal-800"
+                              : "bg-yellow-100 text-yellow-800"
+                          }`}
+                        >
+                          <option value="Pending">Pending</option>
+                          <option value="Confirmed">Confirmed</option>
+                          <option value="Preparing">Preparing</option>
+                          <option value="Ready">Ready</option>
+                          {order.deliveryOption === "delivery" ? (
+                            <>
+                              <option value="OutForDelivery">Out For Delivery</option>
+                              <option value="Delivered">Delivered</option>
+                            </>
+                          ) : (
+                            <option value="Completed">Completed</option>
+                          )}
+                        </select>
+                      )}
+                    </td>
+                    <td className="px-3 py-3 text-xs whitespace-nowrap text-gray-600 hidden md:table-cell">{order.payment}</td>
+                    <td className="px-3 py-3 text-xs whitespace-nowrap">
+                      <span className={`px-2 py-1 rounded-full text-xs font-medium inline-block ${
                         order.deliveryOption === 'delivery'
                           ? 'bg-blue-100 text-blue-800'
                           : 'bg-orange-100 text-orange-800'
                       }`}>
-                        {order.deliveryOption === 'delivery' ? '🚗 Delivery' : '🏠 Pickup'}
+                        {order.deliveryOption === 'delivery' ? '🚗' : '🏠'}
                       </span>
                     </td>
-                    <td className="px-3 sm:px-4 py-3 text-xs sm:text-sm whitespace-nowrap">
+                    <td className="px-3 py-3 text-xs whitespace-nowrap hidden xl:table-cell">
                       {order.deliveryOption === 'pickup' ? (
-                        <span className="text-gray-500 text-xs italic">No driver needed</span>
+                        <span className="text-gray-500 text-xs italic">No driver</span>
                       ) : order.status === "Confirmed" || order.driver !== "Unassigned" ? (
                         <select
                           value={order.driverId || ""}
                           onChange={(e) => handleAssignDriver(order.id, e.target.value)}
                           disabled={driversLoading}
-                          className="px-2 sm:px-3 py-1 rounded-md text-xs border border-gray-300 cursor-pointer hover:border-gray-400 disabled:opacity-50 disabled:cursor-not-allowed"
+                          className="px-2 py-1 rounded-md text-xs border border-gray-300 cursor-pointer hover:border-gray-400 disabled:opacity-50 disabled:cursor-not-allowed"
                         >
-                          <option value="">Select a driver...</option>
+                          <option value="">Select...</option>
                           {drivers.map((driver) => (
                             <option key={driver.id} value={driver.profileId}>
                               {driver.name}
@@ -498,17 +530,17 @@ export function AdminOrders({ orders, onUpdateOrders }: AdminOrdersProps) {
                           ))}
                         </select>
                       ) : (
-                        <span className="text-gray-500 text-xs italic">Accept order to assign</span>
+                        <span className="text-gray-500 text-xs italic">Accept order</span>
                       )}
                     </td>
-                    <td className="px-3 sm:px-4 py-3 whitespace-nowrap">
+                    <td className="px-3 py-3 whitespace-nowrap">
                       {order.status === "Pending" ? (
                         <button 
                           onClick={() => handleAcceptOrder(order.id)}
-                          className="text-green-600 hover:text-green-800 text-xs sm:text-sm font-medium flex items-center gap-1 hover:bg-green-50 px-2 py-1 rounded transition-colors"
+                          className="text-green-600 hover:text-green-800 text-xs font-medium flex items-center gap-1 hover:bg-green-50 px-2 py-1 rounded transition-colors"
+                          title="Accept order"
                         >
                           <Check size={16} />
-                          <span className="hidden sm:inline">Accept</span>
                         </button>
                       ) : (
                         <button 
@@ -516,10 +548,10 @@ export function AdminOrders({ orders, onUpdateOrders }: AdminOrdersProps) {
                             setDeleteOrderId(order.id);
                             setIsDeleteDialogOpen(true);
                           }}
-                          className="text-red-500 hover:text-red-700 text-xs sm:text-sm font-medium flex items-center gap-1 hover:bg-red-50 px-2 py-1 rounded transition-colors"
+                          className="text-red-500 hover:text-red-700 text-xs font-medium flex items-center gap-1 hover:bg-red-50 px-2 py-1 rounded transition-colors"
+                          title="Delete order"
                         >
                           <Trash2 size={16} />
-                          <span className="hidden sm:inline">Delete</span>
                         </button>
                       )}
                     </td>
@@ -554,6 +586,86 @@ export function AdminOrders({ orders, onUpdateOrders }: AdminOrdersProps) {
       
       {/* Toast Notifications */}
       <Toaster />
+
+      {/* Items Details Modal */}
+      {selectedOrderForItems && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
+          <div className="bg-white rounded-lg shadow-lg p-6 max-w-2xl w-full mx-4 max-h-[90vh] overflow-y-auto">
+            <div className="flex items-center justify-between mb-6">
+              <h2 className="text-lg font-semibold">Order Items</h2>
+              <button
+                onClick={() => setSelectedOrderForItems(null)}
+                className="p-1 hover:bg-gray-100 rounded-md transition-colors"
+              >
+                <X size={20} />
+              </button>
+            </div>
+
+            {/* Order Info Summary */}
+            <div className="bg-gray-50 p-4 rounded-lg mb-6">
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <p className="text-xs text-gray-600">Order ID</p>
+                  <p className="font-medium">{selectedOrderForItems.orderId}</p>
+                </div>
+                <div>
+                  <p className="text-xs text-gray-600">Customer</p>
+                  <p className="font-medium">{selectedOrderForItems.name}</p>
+                </div>
+                <div>
+                  <p className="text-xs text-gray-600">Order Date</p>
+                  <p className="font-medium">{selectedOrderForItems.date}</p>
+                </div>
+                <div>
+                  <p className="text-xs text-gray-600">Total Amount</p>
+                  <p className="font-medium">₱{selectedOrderForItems.totalAmount.toFixed(2)}</p>
+                </div>
+              </div>
+            </div>
+
+            {/* Items List */}
+            <div className="space-y-3">
+              <h3 className="font-semibold text-sm mb-3">Items in Order</h3>
+              {selectedOrderForItems.items.length > 0 ? (
+                <div className="space-y-2">
+                  {selectedOrderForItems.items.map((item, idx) => (
+                    <div key={idx} className="flex items-center justify-between p-3 border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors">
+                      <div className="flex-1">
+                        <p className="font-medium text-sm">{item.product.name}</p>
+                        <p className="text-xs text-gray-600">Price: ₱{item.product.price.toFixed(2)}</p>
+                      </div>
+                      <div className="text-right">
+                        <p className="text-sm font-semibold text-blue-600">Qty: {item.quantity}</p>
+                        <p className="text-xs text-gray-600">₱{(item.product.price * item.quantity).toFixed(2)}</p>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <p className="text-sm text-gray-500 italic">No items in this order</p>
+              )}
+            </div>
+
+            {/* Total */}
+            <div className="mt-6 pt-4 border-t border-gray-200">
+              <div className="flex items-center justify-between">
+                <span className="font-semibold">Total:</span>
+                <span className="text-lg font-bold text-blue-600">₱{selectedOrderForItems.totalAmount.toFixed(2)}</span>
+              </div>
+            </div>
+
+            {/* Close Button */}
+            <div className="mt-6">
+              <button
+                onClick={() => setSelectedOrderForItems(null)}
+                className="w-full px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-md transition-colors font-medium"
+              >
+                Close
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Delete Order Confirmation Modal */}
       {isDeleteDialogOpen && (

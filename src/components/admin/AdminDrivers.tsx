@@ -7,8 +7,13 @@ import { Label } from "../ui/label";
 import { toast } from "sonner";
 import { createDriver, fetchDrivers, updateDriver, deleteDriver } from "../../services/driverService";
 import type { Driver } from "../../services/driverService";
+import type { Order } from "../../App";
 
-export function AdminDrivers() {
+interface AdminDriversProps {
+  orders?: Order[];
+}
+
+export function AdminDrivers({ orders = [] }: AdminDriversProps) {
   const [drivers, setDrivers] = useState<Driver[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -182,7 +187,10 @@ export function AdminDrivers() {
   };
 
   const activeDrivers = drivers.filter((d) => d.status === "active").length;
-  const totalDeliveries = drivers.reduce((sum, d) => sum + d.deliveries, 0);
+  // Total deliveries = count of orders with status Ready or Preparing (ready for delivery)
+  const totalDeliveries = orders.filter(
+    (order) => order.status === "Ready" || order.status === "Preparing"
+  ).length;
   const avgRating =
     drivers.length > 0
       ? (drivers.reduce((sum, d) => sum + d.rating, 0) / drivers.length).toFixed(1)

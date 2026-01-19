@@ -32,7 +32,7 @@ export function AdminDashboard({ onLogout, orders, onUpdateOrders, bouquetColors
       case "categories":
         return <AdminOccasions />;
       case "drivers":
-        return <AdminDrivers />;
+        return <AdminDrivers orders={orders} />;
       default:
         return <AdminReports orders={orders} />;
     }
